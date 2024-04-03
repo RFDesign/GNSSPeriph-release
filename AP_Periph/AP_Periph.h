@@ -44,6 +44,10 @@
 
 #define LED_CONNECTED_BRIGHTNESS 10 // 10%
 
+#ifndef I2C_SLAVE_ENABLED
+#define I2C_SLAVE_ENABLED 1
+#endif
+
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 void stm32_watchdog_init();
 void stm32_watchdog_pat();
