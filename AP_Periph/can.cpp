@@ -696,7 +696,7 @@ void AP_Periph_FW::can_update()
             // update LEDs as well
             if (i2c_new_led_data) {
                 i2c_new_led_data = false;
-                set_rgb_led(i2c_led_color_red, i2c_led_color_green, i2c_led_color_blue);
+                set_rgb_led(0, 255, 0);
             }
         }
 #endif
