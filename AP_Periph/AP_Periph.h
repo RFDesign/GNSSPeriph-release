@@ -21,7 +21,6 @@
 
 #include <AP_RTC/JitterCorrection.h>
 #include <AP_HAL/CANIface.h>
-#include <AP_HAL_ChibiOS/EventSource.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <ch.h>
 #include <AP_DroneCAN/AP_Canard_iface.h>
@@ -34,6 +33,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include "MAVLink.h"
 #include "GPS_Base.h"
+#include "GPS_Rover.h"
 
 #if defined(HAL_PERIPH_ENABLE_BATTERY_MPPT_PACKETDIGITAL) && HAL_MAX_CAN_PROTOCOL_DRIVERS < 2
 #error "Battery MPPT PacketDigital driver requires at least two CAN Ports"
@@ -44,9 +44,6 @@
 
 #define LED_CONNECTED_BRIGHTNESS 10 // 10%
 
-#ifndef I2C_SLAVE_ENABLED
-#define I2C_SLAVE_ENABLED 1
-#endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 void stm32_watchdog_init();
@@ -126,8 +123,9 @@ public:
 
     void toshibaled_interface_recv_byte(uint8_t recv_byte_idx, uint8_t recv_byte);
 
+#ifdef I2C_SLAVE_ENABLED
     void i2c_setup();
-
+#endif
     uint8_t compass_reg;
     struct reg_list {
         struct reg_list *next;
@@ -173,6 +171,7 @@ public:
     uint64_t last_time_sync_usec;
     int64_t time_offset_usec;
 
+#ifdef I2C_SLAVE_ENABLED
     uint8_t i2c_led_color_red;
     uint8_t i2c_led_color_green;
     uint8_t i2c_led_color_blue;
@@ -183,10 +182,8 @@ public:
     uint8_t i2c2_transfer_address;
     uint8_t i2c2_transfer_direction;
     bool _setup_ser_i2c_mode;
+#endif
 
-    HAL_EventHandle i2c_event_handle;
-    ChibiOS::EventSource i2c_event_source;
-    
     static AP_Periph_FW *_singleton;
 
     enum class DebugOptions {
@@ -223,6 +220,9 @@ public:
 
     void show_progress(uint32_t pct);
 
+    // reboot the peripheral, optionally holding in bootloader
+    void reboot(bool hold_in_bootloader);
+
     static uint64_t get_tracked_tx_timestamp(uint8_t i);
 
 #ifdef HAL_USB_VBUS_SENS_CHAN
@@ -241,6 +241,7 @@ public:
 
 
 class AP_Periph_DroneCAN {
+    uint8_t timesync_tid[HAL_NUM_CAN_IFACES];
 public:
     AP_Periph_DroneCAN();
 
@@ -266,11 +267,7 @@ public:
     Canard::Publisher<uavcan_equipment_gnss_Fix2> fix2_pub{canard_iface};
     Canard::Publisher<uavcan_equipment_gnss_Auxiliary> aux_pub{canard_iface};
     Canard::Publisher<ardupilot_gnss_Status> gnss_status_pub{canard_iface};
-#if HAL_NUM_CAN_IFACES == 1
-    Canard::Publisher<uavcan_protocol_GlobalTimeSync> global_time_sync_pub[HAL_NUM_CAN_IFACES] = {{canard_iface}};
-#else
-    Canard::Publisher<uavcan_protocol_GlobalTimeSync> global_time_sync_pub[HAL_NUM_CAN_IFACES] = {{canard_iface, 1}, {canard_iface, 1<<1}};
-#endif
+
     void send_moving_baseline_msg();
     Canard::Publisher<ardupilot_gnss_MovingBaselineData> moving_baseline_pub{canard_iface};
 
@@ -370,6 +367,8 @@ namespace AP
 extern AP_Periph_FW periph;
 
 extern "C" {
+void can_vprintf(uint8_t severity, const char *fmt, va_list arg);
+void can_printf_severity(uint8_t severity, const char *fmt, ...) FMT_PRINTF(2,3);
 void can_printf(const char *fmt, ...) FMT_PRINTF(1,2);
 }
 

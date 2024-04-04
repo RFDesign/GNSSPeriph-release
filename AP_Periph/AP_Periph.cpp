@@ -162,9 +162,8 @@ void AP_Periph_FW::init()
 #ifdef I2C_SLAVE_ENABLED
     enable_gps = !g.serial_i2c_mode;
 #endif
-
-    if (gps.get_type(0) != AP_GPS::GPS_Type::GPS_TYPE_NONE && enable_gps) {
-        gps.init(serial_manager);
+    if (enable_gps) {
+        gps.init();
     } else {
 #ifdef GPIO_USART1_RX
         // setup gpio passthrough
@@ -177,9 +176,9 @@ void AP_Periph_FW::init()
 #endif
     }
 
-    i2c_event_handle.set_source(&i2c_event_source);
-    i2c_event_handle.register_event(1);
+#ifdef I2C_SLAVE_ENABLED
     i2c_setup();
+#endif
 
     compass.init();
 
@@ -258,6 +257,7 @@ void AP_Periph_FW::update()
 
 #ifdef ENABLE_BASE_MODE
     gps_base.update();
+    gps_rover.update();
 #endif
 
     SRV_Channels::enable_aux_servos();
@@ -296,6 +296,7 @@ void AP_Periph_FW::update()
 
     rcout_update();
 
+#ifdef I2C_SLAVE_ENABLED
     if (_setup_ser_i2c_mode && AP_Periph_FW::no_iface_finished_dna) {
         hal.scheduler->expect_delay_ms(100);
         g.serial_i2c_mode.set_and_save(1);
@@ -310,7 +311,9 @@ void AP_Periph_FW::update()
         hal.scheduler->reboot(false);
     }
 
-    if (!g.serial_i2c_mode) {
+    if (!g.serial_i2c_mode)
+#endif
+    {
         update_rainbow();
     }
 
@@ -376,6 +379,15 @@ void AP_Periph_FW::prepare_reboot()
         // delay to give the ACK a chance to get out, the LEDs to flash,
         // the IO board safety to be forced on, the parameters to flush,
         hal.scheduler->delay(40);
+}
+
+
+/*
+  reboot, optionally holding in bootloader. For scripting
+ */
+void AP_Periph_FW::reboot(bool hold_in_bootloader)
+{
+    hal.scheduler->reboot(hold_in_bootloader);
 }
 
 AP_Periph_FW *AP_Periph_FW::_singleton;
