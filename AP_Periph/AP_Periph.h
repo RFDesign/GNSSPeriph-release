@@ -35,6 +35,7 @@
 #include "GPS_Base.h"
 #include "GPS_Rover.h"
 #include <AP_Common/ExpandingString.h>
+#include <AP_GPS/Buffer.hpp>
 
 
 #include "Parameters.h"
@@ -246,6 +247,15 @@ public:
     ObjectBuffer<uavcan_protocol_debug_LogMessage> log_buffer{20};
 
     ExpandingString uart_info;
+
+    /**
+     * GPS Serial Sniffer
+     */
+    void init_gps_serial_sniffer(void);
+    void process_gps_serial_sniffer(void);
+    
+    AP_HAL::UARTDriver *_gps_sniffer; // GPS sniffer port
+    uint32_t last_send_ms{0};
 };
 
 

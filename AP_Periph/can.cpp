@@ -679,10 +679,11 @@ void AP_Periph_FW::can_update()
     if (AP_HAL::millis() > send_next_node_id_allocation_request_at_ms) {
         can_do_dna();
     }
-    bool enable_gps = true;
-#ifdef I2C_SLAVE_ENABLED
-    enable_gps = !g.serial_i2c_mode;
-#endif
+
+//     bool enable_gps = true;
+// #ifdef I2C_SLAVE_ENABLED
+//     enable_gps = !g.serial_i2c_mode;
+// #endif
     
 #ifdef I2C_SLAVE_ENABLED
     // update LEDs as well
@@ -698,9 +699,10 @@ void AP_Periph_FW::can_update()
             process1HzTasks(AP_HAL::micros64());
         }
 
-        if (enable_gps) {
+        // if (enable_gps)
+        {
             dronecan->can_gps_update();
-            dronecan->send_serial_monitor_data();
+            // dronecan->send_serial_monitor_data();
         }
     
         dronecan->can_mag_update();
