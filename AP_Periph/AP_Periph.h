@@ -35,10 +35,21 @@
 #include "GPS_Base.h"
 #include "GPS_Rover.h"
 #include <AP_Common/ExpandingString.h>
-#include <AP_GPS/Buffer.hpp>
 
 
 #include "Parameters.h"
+
+/**
+ * RFD: This macro is enabled in RFD-customed AP_GPS/AP_GPS.cpp in ArduPilot submodule
+ * If custom ArduPilot not available, serial sniffer in DroneCAN MovingBaseline is disabled
+ */
+#ifndef RFD_MBL_SERIAL_SNIFFER_ENABLED
+#define RFD_MBL_SERIAL_SNIFFER_ENABLED 0
+#endif
+
+#if RFD_MBL_SERIAL_SNIFFER_ENABLED
+#include <AP_GPS/Buffer.hpp>
+#endif
 
 #define LED_CONNECTED_BRIGHTNESS 10 // 10%
 
@@ -249,12 +260,16 @@ public:
     ExpandingString uart_info;
 
     /**
-     * GPS Serial Sniffer
+     * RFD: GPS Ublox Serial Passthrough and Sniffer for MovingBaseline
      */
-    void init_gps_serial_sniffer(void);
-    void process_gps_serial_sniffer(void);
-    
-    AP_HAL::UARTDriver *_gps_sniffer; // GPS sniffer port
+    void init_gps_serial(void);
+    void sniff_gps_ublox(void);
+#ifdef I2C_SLAVE_ENABLED
+    void process_ublox_serial_passthrough(void);
+#endif
+
+    AP_HAL::UARTDriver *_gps_console; // GPS sniffer port
+    AP_HAL::UARTDriver *_ublox_port; // Ublox GPS port  
     uint32_t last_send_ms{0};
 };
 
