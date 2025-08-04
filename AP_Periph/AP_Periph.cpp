@@ -414,7 +414,7 @@ void AP_Periph_FW::init_gps_serial_sniffer()
 void AP_Periph_FW::process_gps_serial_sniffer()
 {
     if (!_gps_sniffer->is_initialized()) return;
-    uint8_t Buffer[RFD::MAX_PACKET_LENGTH];
+    uint8_t Buffer[1000];
     size_t Size = gps.GetUbxBuffer(Buffer);
     if (Size == 0) return;
     _gps_sniffer->write(Buffer, Size);
