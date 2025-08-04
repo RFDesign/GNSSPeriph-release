@@ -107,7 +107,7 @@ void AP_Periph_FW::init()
     stm32_watchdog_pat();
 
     // hal.serial(0)->begin(AP_SERIALMANAGER_CONSOLE_BAUD, 2048, 2048);
-    hal.serial(3)->begin(115200, 128, 256);
+    // hal.serial(3)->begin(115200, 128, 256);
 
     load_parameters();
 
@@ -166,9 +166,17 @@ void AP_Periph_FW::init()
         gps.init();
     } else {
 #ifdef GPIO_USART1_RX
-    init_gps_serial_sniffer();
+    // // setup gpio passthrough
+    // hal.gpio->set_mode(GPIO_USART1_RX, HAL_GPIO_INPUT);
+    // hal.gpio->set_mode(GPIO_USART1_TX, HAL_GPIO_OUTPUT);
+    // hal.gpio->set_mode(GPIO_USART2_RX, HAL_GPIO_INPUT);
+    // hal.gpio->set_mode(GPIO_USART2_TX, HAL_GPIO_OUTPUT);
+    // hal.gpio->attach_interrupt(GPIO_USART1_RX, FUNCTOR_BIND_MEMBER(&AP_Periph_FW::gpio_passthrough_isr, void, uint8_t, bool, uint32_t), AP_HAL::GPIO::INTERRUPT_BOTH);
+    // hal.gpio->attach_interrupt(GPIO_USART2_RX, FUNCTOR_BIND_MEMBER(&AP_Periph_FW::gpio_passthrough_isr, void, uint8_t, bool, uint32_t), AP_HAL::GPIO::INTERRUPT_BOTH);
 #endif
     }
+
+    init_gps_serial();
 
 #ifdef I2C_SLAVE_ENABLED
     i2c_setup();
@@ -324,15 +332,18 @@ void AP_Periph_FW::update()
         hal.scheduler->reboot(false);
     }
 
-    if (!g.serial_i2c_mode)
+    if (g.serial_i2c_mode)
+    {
+        process_ublox_serial_passthrough();
+    }
+    else
 #endif
     {
         update_rainbow();
+        sniff_gps_ublox();
     }
 
     can_update();
-
-    process_gps_serial_sniffer();
 }
 
 #ifdef HAL_PERIPH_LISTEN_FOR_SERIAL_UART_REBOOT_CMD_PORT
@@ -405,19 +416,50 @@ void AP_Periph_FW::reboot(bool hold_in_bootloader)
     hal.scheduler->reboot(hold_in_bootloader);
 }
 
-void AP_Periph_FW::init_gps_serial_sniffer()
+/**
+ * RFD: Initialise console and gps serial for both DroneCAN and SerialPassthrough interfaces 
+ */
+void AP_Periph_FW::init_gps_serial()
 {
-    _gps_sniffer = hal.serial(0);
-    _gps_sniffer->begin(460800, 2048, 2048);
+    _gps_console = hal.serial(0);
+    _gps_console->begin(460800, 8192, 8192);
+    _ublox_port = hal.serial(3);
+    _ublox_port->begin(460800, 8192, 8192);
 }
 
-void AP_Periph_FW::process_gps_serial_sniffer()
+#ifdef I2C_SLAVE_ENABLED
+/**
+ * RFD: Bi-directional Console <-> Ublox serial passthrough
+ * This replaces the interrupt-based passthrough
+ */
+void AP_Periph_FW::process_ublox_serial_passthrough()
 {
-    if (!_gps_sniffer->is_initialized()) return;
+    // send characters received from the console to the GPS
+    while(_gps_console->available())
+    {
+        _ublox_port->write(_gps_console->read());
+    }
+    // send GPS characters to the console
+    while(_ublox_port->available())
+    {
+        _gps_console->write(_ublox_port->read());
+    }
+}
+#endif
+
+/**
+ * RFD: Ublox packet serial sniffer in DroneCAN MovingBaseline interface
+ * Only enabled if RFD-customed AP_GPS code in ArduPilot submodule is available
+ */
+void AP_Periph_FW::sniff_gps_ublox()
+{
+#if RFD_MBL_SERIAL_SNIFFER_ENABLED
+    if (!_gps_console->is_initialized()) return;
     uint8_t Buffer[1000];
     size_t Size = gps.GetUbxBuffer(Buffer);
     if (Size == 0) return;
-    _gps_sniffer->write(Buffer, Size);
+    _gps_console->write(Buffer, Size);
+#endif
 }
 
 AP_Periph_FW *AP_Periph_FW::_singleton;
